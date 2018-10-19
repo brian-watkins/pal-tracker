@@ -10,6 +10,12 @@ db_name=`echo $credentials | jq -r '.name'`
 db_username=`echo $credentials | jq -r '.username'`
 db_password=`echo $credentials | jq -r '.password'`
 
+if cf ssh pal-tracker -c pwd ; then
+  echo "Able to cf ssh to pal-tracker"
+else
+  echo "Now you should be able to cf ssh to pal-tracker"
+fi
+
 echo "Opening ssh tunnel to $ip_address"
 cf ssh -N -L 63306:$ip_address:3306 pal-tracker &
 cf_ssh_pid=$!
