@@ -5,10 +5,13 @@ import io.pivotal.pal.tracker.TimeEntryController;
 import io.pivotal.pal.tracker.TimeEntryRepository;
 import org.junit.Before;
 import org.junit.Test;
+import org.springframework.boot.actuate.metrics.CounterService;
+import org.springframework.boot.actuate.metrics.GaugeService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 
 import static java.util.Arrays.asList;
@@ -20,11 +23,16 @@ import static org.mockito.Mockito.*;
 public class TimeEntryControllerTest {
     private TimeEntryRepository timeEntryRepository;
     private TimeEntryController controller;
+    private CounterService fakeCounter = mock(CounterService.class);
+    private GaugeService fakeGauge = mock(GaugeService.class);
 
     @Before
     public void setUp() throws Exception {
         timeEntryRepository = mock(TimeEntryRepository.class);
-        controller = new TimeEntryController(timeEntryRepository);
+        controller = new TimeEntryController(timeEntryRepository, fakeCounter, fakeGauge);
+
+        when(timeEntryRepository.list())
+                .thenReturn(Arrays.asList(mock(TimeEntry.class), mock(TimeEntry.class)));
     }
 
     @Test
@@ -35,13 +43,13 @@ public class TimeEntryControllerTest {
             .when(timeEntryRepository)
             .create(any(TimeEntry.class));
 
-
         ResponseEntity response = controller.create(timeEntryToCreate);
-
 
         verify(timeEntryRepository).create(timeEntryToCreate);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).isEqualTo(expectedResult);
+        verify(fakeCounter).increment("TimeEntry.created");
+        verify(fakeGauge).submit("timeEntries.count", 2.0);
     }
 
     @Test
@@ -56,6 +64,7 @@ public class TimeEntryControllerTest {
         verify(timeEntryRepository).find(1L);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEqualTo(expected);
+        verify(fakeCounter).increment("TimeEntry.read");
     }
 
     @Test
@@ -66,6 +75,7 @@ public class TimeEntryControllerTest {
 
         ResponseEntity<TimeEntry> response = controller.read(1L);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        verifyZeroInteractions(fakeCounter);
     }
 
     @Test
@@ -81,6 +91,7 @@ public class TimeEntryControllerTest {
         verify(timeEntryRepository).list();
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEqualTo(expected);
+        verify(fakeCounter).increment("TimeEntry.listed");
     }
 
     @Test
@@ -95,6 +106,7 @@ public class TimeEntryControllerTest {
         verify(timeEntryRepository).update(1L, expected);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEqualTo(expected);
+        verify(fakeCounter).increment("TimeEntry.updated");
     }
 
     @Test
@@ -105,12 +117,17 @@ public class TimeEntryControllerTest {
 
         ResponseEntity response = controller.update(1L, new TimeEntry());
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+
+        verifyZeroInteractions(fakeCounter);
     }
 
     @Test
     public void testDelete() throws Exception {
         ResponseEntity<TimeEntry> response = controller.delete(1L);
+
         verify(timeEntryRepository).delete(1L);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        verify(fakeCounter).increment("TimeEntry.deleted");
+        verify(fakeGauge).submit("timeEntries.count", 2.0);
     }
 }
